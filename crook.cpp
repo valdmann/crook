@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cerrno>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
@@ -35,10 +36,10 @@
 
 using namespace std;
 
-typedef unsigned char  U8;
-typedef unsigned short U16;
-typedef unsigned int   U32;
-typedef unsigned long  U64;
+typedef uint8_t  U8;
+typedef uint16_t U16;
+typedef uint32_t U32;
+typedef uint64_t U64;
 
 const U32 ARI_P_BITS  = 12;
 const U32 ARI_P_SCALE = 1 << ARI_P_BITS;
