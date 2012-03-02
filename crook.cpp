@@ -70,12 +70,6 @@ int command     = 0;
 int memoryLimit = DEFAULT_MEMORY_LIMIT;
 int orderLimit  = DEFAULT_ORDER_LIMIT;
 
-FILE * textFile;
-FILE * codeFile;
-
-const char * textFileName;
-const char * codeFileName;
-
 class ReciprocalTable
 {
     U16 t[DIVISOR_LIMIT];
@@ -249,13 +243,15 @@ public:
 
 class Encoder
 {
+    FILE * codeFile;
     U64 low;
     U32 range;
     U32 fluxLen;
     U8  fluxFst;
 public:
-    Encoder()
-        : low(0),
+    Encoder(FILE * codeFile)
+        : codeFile(codeFile),
+          low(0),
           range(0xFFFFFFFF),
           fluxLen(1),
           fluxFst(0) {}
@@ -303,11 +299,13 @@ public:
 
 class Decoder
 {
+    FILE * codeFile;
     U32 range;
     U32 cml;
 public:
-    Decoder()
-        : range(0xFFFFFFFF),
+    Decoder(FILE * codeFile)
+        : codeFile(codeFile),
+          range(0xFFFFFFFF),
           cml(0) {}
 
     void FillBuffer()
@@ -376,10 +374,8 @@ public:
         fflush(stdout);
     }
 
-    void Finish()
+    void Finish(U32 textLength, U32 codeLength)
     {
-        U32 textLength = ftell(textFile);
-        U32 codeLength = ftell(codeFile);
         double seconds = (double)(clock() - start) / CLOCKS_PER_SEC;
         double bpc = 8.0 * codeLength / textLength;
 
@@ -392,7 +388,7 @@ public:
     }
 };
 
-void Compress()
+void Compress(FILE * textFile, FILE * codeFile)
 {
     fseek(textFile, 0, SEEK_END);
     U32 textLength = ftell(textFile);
@@ -404,7 +400,7 @@ void Compress()
     putc(textLength >>  0, codeFile);
 
     ProgressBar bar;
-    Encoder rc;
+    Encoder rc(codeFile);
     PPM ppm;
     for (U32 processed = 0; processed != textLength; ++processed)
     {
@@ -428,17 +424,10 @@ void Compress()
         }
     }
     rc.FlushBuffer();
-
-    if (ferror(codeFile))
-    {
-        perror(codeFileName);
-        exit(1);
-    }
-
-    bar.Finish();
+    bar.Finish(textLength, ftell(codeFile));
 }
 
-void Decompress()
+void Decompress(FILE * codeFile, FILE * textFile)
 {
     U32 textLength = 0;
     textLength += getc(codeFile) << 24;
@@ -447,7 +436,7 @@ void Decompress()
     textLength += getc(codeFile) <<  0;
 
     ProgressBar bar;
-    Decoder rc;
+    Decoder rc(codeFile);
     PPM ppm;
     rc.FillBuffer();
     for (U32 processed = 0; processed != textLength; ++processed)
@@ -471,14 +460,7 @@ void Decompress()
         }
         putc(c, textFile);
     }
-
-    if (ferror(textFile))
-    {
-        perror(textFileName);
-        exit(1);
-    }
-
-    bar.Finish();
+    bar.Finish(textLength, ftell(codeFile));
 }
 
 char * optarg = NULL;
@@ -640,15 +622,21 @@ int main(int argc, char ** argv)
     }
 
     if (command == 'c')
-    {
-        textFile = input,  textFileName = argv[optind+1];
-        codeFile = output, codeFileName = argv[optind+2];
-        Compress();
-    }
+        Compress(input, output);
     else
+        Decompress(input, output);
+
+    if (ferror(input))
     {
-        textFile = output, textFileName = argv[optind+2];
-        codeFile = input,  codeFileName = argv[optind+1];
-        Decompress();
+        fprintf(stderr, "%s: cannot read from '%s' (%s)\n",
+                argv[0], argv[optind+1], strerror(errno));
+        exit(1);
+    }
+
+    if (ferror(output))
+    {
+        fprintf(stderr, "%s: cannot write to '%s' (%s)\n",
+                argv[0], argv[optind+2], strerror(errno));
+        exit(1);
     }
 }
