@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <unistd.h>
 
@@ -541,13 +542,14 @@ int main(int argc, char ** argv)
     if ((argv[optind][0] != 'c' && argv[optind][0] != 'd') ||
         argv[optind][1] != 0)
     {
-        fprintf(stderr, "unrecognized command '%s'\n", argv[optind]);
+        fprintf(stderr, "%s: unrecognized command '%s'\n",
+	       	argv[0], argv[optind]);
         return 1;
     }
 
     if (optind + 2 >= argc)
     {
-        fputs("too few arguments given\n", stderr);
+	fprintf(stderr, "%s: not enough arguments given\n", argv[0]);
         return 1;
     }
 
@@ -556,14 +558,16 @@ int main(int argc, char ** argv)
     FILE * input = fopen(argv[optind+1], "rb");
     if (input == NULL)
     {
-        perror(argv[optind+1]);
+	fprintf(stderr, "%s: cannot open '%s' (%s)\n",
+		argv[0], argv[optind+1], strerror(errno));
         return 1;
     }
 
     FILE * output = fopen(argv[optind+2], "wb");
     if (output == NULL)
     {
-        perror(argv[optind+2]);
+	fprintf(stderr, "%s: cannot open '%s' (%s)\n",
+		argv[0], argv[optind+2], strerror(errno));
         return 1;
     }
 
