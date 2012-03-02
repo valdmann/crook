@@ -27,6 +27,11 @@
 #define getc getc_unlocked
 #endif
 
+#ifdef _MSC_VER
+#define putc _fputc_nolock
+#define getc _fgetc_nolock
+#endif
+
 #define PROGRAM_NAME    "crook"
 #define PROGRAM_VERSION "0.1"
 #define PROGRAM_AUTHOR  "Jüri Valdmann <juri.valdmann@gmail.com>"
