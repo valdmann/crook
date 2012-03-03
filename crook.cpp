@@ -32,13 +32,6 @@
 #define getc _fgetc_nolock
 #endif
 
-#define PROGRAM_NAME    "crook"
-#define PROGRAM_VERSION "0.1"
-#define PROGRAM_AUTHOR  "Jüri Valdmann <juri.valdmann@gmail.com>"
-
-#define DEFAULT_MEMORY_LIMIT 128
-#define DEFAULT_ORDER_LIMIT  4
-
 using namespace std;
 
 typedef uint8_t  U8;
@@ -67,8 +60,8 @@ const U32 PPM_C_INH   = PPM_C_SCALE * 3 / 2;
 const U32 PPM_C_INC   = PPM_C_SCALE;
 
 int command     = 0;
-int memoryLimit = DEFAULT_MEMORY_LIMIT;
-int orderLimit  = DEFAULT_ORDER_LIMIT;
+int memoryLimit = 128;
+int orderLimit  = 4;
 
 class ReciprocalTable
 {
@@ -527,12 +520,6 @@ int getopt(int argc, char ** argv, const char * spec)
     }
 }
 
-#define STRINGIFY_(x) #x
-#define STRINGIFY(x) STRINGIFY_(x)
-
-#define DML STRINGIFY(DEFAULT_MEMORY_LIMIT)
-#define DOL STRINGIFY(DEFAULT_ORDER_LIMIT)
-
 int main(int argc, char ** argv)
 {
     bool help = false;
@@ -565,26 +552,26 @@ int main(int argc, char ** argv)
 
     if (help)
     {
-        puts("Usage: " PROGRAM_NAME " <command> [<options...>] <input> <output>\n"
-             "\n"
-             "Commands:\n"
-             "   c       compress\n"
-             "   d       decompress\n"
+        puts("To compress a file invoke the program like this\n"
+             "  crook c INPUT OUTPUT\n"
+             "To decompress\n"
+             "  crook d INPUT OUTPUT\n"
+             "Existing output files are overwritten.\n"
              "\n"
              "Options:\n"
-             "  -h       print this message\n"
-             "  -V       print program version\n"
-             "  -mN      use N megabytes of memory (default: " DML " MiB)\n"
-             "  -ON      use order N contexts for modelling (default: " DOL ")\n"
+             "  -h   print this message\n"
+             "  -V   print program version\n"
+             "  -mN  use at most N megabytes of memory (default: 128)\n"
+             "  -ON  use at most N previous bytes as context (default: 4)\n"
+             "Options may be specified anywhere on the command line.\n"
              "\n"
-             "Output files are overwritten.  Options for compression and\n"
-             "decompression need to be identical, otherwise decompression\n"
-             "will fail.\n");
+             "Warning: identical options must be passed both when compressing and\n"
+             "when decompressing, otherwise decompression will fail silently.\n");
     }
 
     if (help || version)
     {
-        puts(PROGRAM_NAME " " PROGRAM_VERSION " by " PROGRAM_AUTHOR);
+        puts("crook 0.1 by Jüri Valdmann <juri.valdmann@gmail.com>");
         return 0;
     }
 
