@@ -630,13 +630,13 @@ int main(int argc, char ** argv)
     {
         fprintf(stderr, "%s: cannot read from '%s' (%s)\n",
                 argv[0], argv[optind+1], strerror(errno));
-        exit(1);
+        return 1;
     }
 
     if (ferror(output))
     {
         fprintf(stderr, "%s: cannot write to '%s' (%s)\n",
                 argv[0], argv[optind+2], strerror(errno));
-        exit(1);
+        return 1;
     }
 }
