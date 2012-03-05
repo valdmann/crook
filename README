@@ -1,0 +1,14 @@
+    ___ _ __ ___   ___ | | __
+   / __| '__/ _ \ / _ \| |/ /
+  | (__| | | (_) | (_) |   <
+   \___|_|  \___/ \___/|_|\_\.
+
+This is "crook" - a simple experimental file compressor.  Being
+experimental you probably shouldn't use it to compress important data.
+For ease of distribution the source code is condensed into a single
+file.
+
+Crook can be considered a variant of the PPM algorithm, except it
+works with a binary alphabet and so does not need to use escapes.
+Instead of escapes it uses information inheritance to blend statistics
+from different orders.  See crook.cpp for more information.

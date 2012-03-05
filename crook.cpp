@@ -44,12 +44,12 @@
 //
 // Crook can perhaps be considered a variant of the PPM (prediction by
 // partial matching, [2]) algorithm, except it works with a binary
-// alphabet and so cannot use escapes.  Instead of escapes it uses
-// information inheritance to blend statistics from different orders.
-// Indeed both escapes and inheritance can be considered different
-// optimizations of the context mixing or full blending model: escapes
-// make mixing faster and inheritance precomputes the mixture on state
-// creation.
+// alphabet and so does not need to use escapes.  Instead of escapes
+// it uses information inheritance to blend statistics from different
+// orders.  Indeed both escapes and inheritance can be considered
+// different optimizations of the context mixing or full blending
+// model: escapes make mixing faster and inheritance precomputes the
+// mixture on state creation.
 //
 // Crook started life as a simple, vanilla implementation of DMC
 // (dynamic Markov compression, [3]).  In her PhD thesis [4] Suzanne
