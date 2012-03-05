@@ -11,8 +11,122 @@
 // This software comes without any warranty.  Everyone is permitted to
 // use and distribute this software or modified copies of this
 // software for any purpose, commercial or non-commercial.
+//
+// COMPILATION
+//
+// When compiling with GCC try the following for maximum performance:
+//   g++ -O3 -s -fno-exceptions -finline-limit=10000 -fwhole-program
+//       -std=c++0x crook.cpp -o crook
+//
+// INVOCATION
+//
+// To compress a file invoke the program like this
+//   crook c INPUT OUTPUT
+// To decompress
+//   crook d INPUT OUTPUT
+// Existing output files are overwritten.
+//
+// Options:
+//   -h   print this message
+//   -V   print program version
+//   -mN  use at most N megabytes of memory (default: 128)
+//   -ON  use at most N previous bytes as context (default: 4)
+// Options may be specified anywhere on the command line.
+//
+// Warning: identical options must be passed both when compressing and
+// when decompressing, otherwise decompression will fail silently.
+//
+// HOW IT WORKS or WHY PPM IS WAY BETTER THAN DMC
+//
+// I assume familiarity with the "modern data compression paradigm".
+// For an introduction to this and other relevant topics I'd recommend
+// "Text compression" by Bell, Cleary & Witten [1].
+//
+// Crook can perhaps be considered a variant of the PPM (prediction by
+// partial matching, [2]) algorithm, except it works with a binary
+// alphabet and so cannot use escapes.  Instead of escapes it uses
+// information inheritance to blend statistics from different orders.
+// Indeed both escapes and inheritance can be considered different
+// optimizations of the context mixing or full blending model: escapes
+// make mixing faster and inheritance precomputes the mixture on state
+// creation.
+//
+// Crook started life as a simple, vanilla implementation of DMC
+// (dynamic Markov compression, [3]).  In her PhD thesis [4] Suzanne
+// Bunton explores the theoretical properties of models built by DMC.
+// She concludes that DMC is theoretically capable of building more
+// expressive models than PPM.  Although she also mentions how in some
+// cases the DMC models can be a little bit flawed.
+//
+// I wrote Crook to explore and experiment with DMC's model structure
+// and growth heuristics.  As a result of these experiments I can say
+// that pretty much all of the features of DMC that distinguish it
+// from binary PPM are counterproductive in practice.  To wit:
+//
+// * DMC can have distinct states which correspond to the same longest
+//   matching context.  In theory this increases the expressivity of
+//   the model.  In practice the statistics just become diluted.  A
+//   simple way to fix this is 'owner protection': redirect an edge
+//   only once.  This gave an immediate improvement in compression
+//   ratio.
+//
+// * DMC's model structure is affected by the temporal order in which
+//   contexts occur.  Imagine a PPM algorithm that "forgot" to update
+//   higher-order states' successor pointers when adding a new state.
+//   So if you have current symbol "c" and current context "ra" with
+//   successor succ("ra", "c") == "ac".  You create a new state "rac"
+//   and update succ("ra", "c") := "rac", but you forget to update
+//   succ("bra", "c") to "rac", and it'll still point to "ac".  In the
+//   end it's as if PPM got so drunk it can't figure out what the
+//   longest matching context is anymore.
+//
+//   I fixed this by introducing suffix pointers into each state and
+//   using right-extension pointers instead of successor pointers
+//   since I couldn't figure out how to update the successor pointers
+//   correctly.  I think Shkarin's PPMd maybe does this but I was too
+//   lazy to try decyphering how that bit works.
+//
+// * When Cormack and Horspool invented information inheritance in
+//   1987 they also invented it's evil twin: information stealing.
+//   DMC subtracts a portion of the counts when cloning states.  I
+//   removed this, and lo and behold: compression improved.  Hard to
+//   believe Cormack and Horspool didn't try this, so I don't know
+//   what's up with this.
+//
+// * Finally: the growth heuristic of DMC.  This was actually the
+//   feature I was most interested in, and for a while it seemed to
+//   perform better than PPM's global order limit.  Then I realized it
+//   was just creating way more states; after normalizing the memory
+//   usage it become apparent that the way of the PPM is again
+//   superior (in this case only slightly superior though IIRC).
+//
+// The only remaining distinguishing feature of original vanilla DMC
+// in comparison to original vanilla PPMC is information inheritance.
+// Now inheritance is pretty damn obvious and easy for the binary
+// case, so I'm not going to count it as a DMC exclusive.  I mean
+// binary PPM w/o inheritance is just a plain order-N Markov model.
+//
+// REFERENCES
+//
+// [1] Bell, Timothy C.; Cleary, John G.; Witten, Ian H.
+//     "Text compression"
+//     Prentice Hall (1990).
+//
+// [2] Cleary, John G.; Witten, Ian H.
+//     "Data Compression Using Adaptive Coding and Partial String Matching"
+//     IEEE Trans. Comm. 32 (1984) no. 4, 396-402.
+//
+// [3] Cormack, G. V.; Horspool, R. N. S.
+//     "Data compression using dynamic Markov modelling"
+//     Comput. J. 30 (1987) no. 6, 541-550.
+//
+// [4] Bunton, Suzanne
+//     "On-Line Stochastic Processes in Data Compression"
+//     University of Washington (1996).
 
+// disable asserts for a moderate speed-up:
 #define NDEBUG
+
 #include <algorithm>
 #include <cassert>
 #include <cerrno>
@@ -22,11 +136,14 @@
 #include <cstring>
 #include <ctime>
 
+// since crook is single-threaded it won't need thread-safe I/O; with
+// GNU libc (and others?) the _unlocked variants will do the job:
 #ifdef __GLIBC__
 #define putc putc_unlocked
 #define getc getc_unlocked
 #endif
 
+// same sort of thing for Windows:
 #ifdef _MSC_VER
 #define putc _fputc_nolock
 #define getc _fgetc_nolock
@@ -39,14 +156,25 @@ typedef uint16_t U16;
 typedef uint32_t U32;
 typedef uint64_t U64;
 
+// fractional numbers are represented in fixed-point form; for the
+// following constants a certain naming scheme is used:
+//   _BITS  - total bits for both the whole and the fractional parts together
+//   _SCALE - unit, i.e. the representation for the number 1
+//            if omitted then it's just 1 (i.e. there's no fractional part)
+//   _LIMIT - one larger than the largest number that can be represented
+//            if omitted then equal to _SCALE (i.e. there's no whole part)
+
+// probabilities in the arithmetic coder:
 const U32 ARI_P_BITS  = 12;
 const U32 ARI_P_SCALE = 1 << ARI_P_BITS;
 
+// divisors and reciprocals, see REPLACING DIVISIONS:
 const U32 DIVISOR_BITS     = 10;
 const U32 DIVISOR_LIMIT    = 1 << DIVISOR_BITS;
 const U32 RECIPROCAL_BITS  = 15;
 const U32 RECIPROCAL_LIMIT = 1 << RECIPROCAL_BITS;
 
+// probabilities and counts in the model, see THE NODE and THE MODEL:
 const U32 PPM_P_BITS  = 22;
 const U32 PPM_C_BITS  = 10;
 const U32 PPM_P_SCALE = 1 << PPM_P_BITS;
@@ -55,13 +183,33 @@ const U32 PPM_C_SCALE = 32;
 const U32 PPM_P_MASK  = (PPM_P_SCALE  - 1) << PPM_C_BITS;
 const U32 PPM_C_MASK  = PPM_C_LIMIT - 1;
 const U32 PPM_P_START = PPM_P_SCALE / 2;
-const U32 PPM_C_START = PPM_C_SCALE * 12;
-const U32 PPM_C_INH   = PPM_C_SCALE * 3 / 2;
+const U32 PPM_C_START = PPM_C_SCALE * 12;     // these were hand-tuned
+const U32 PPM_C_INH   = PPM_C_SCALE * 3 / 2;  // on enwik7
 const U32 PPM_C_INC   = PPM_C_SCALE;
 
-int command     = 0;
-int memoryLimit = 128;
-int orderLimit  = 4;
+// command line options:
+int command     = 0;   // 'c' or 'd'
+int memoryLimit = 128; // memory limit in MiB
+int orderLimit  = 4;   //  order limit in bytes
+
+// REPLACING DIVISIONS
+//
+// In the pursuit of speed I have replaced all divisions (well there's
+// only the one atm) with multiplications by the corresponding
+// reciprocal which is looked up from a table:
+//
+// > x / y = x * (1/y).
+//
+// This is faster.
+//
+// The table is computed by the constructor of class ReciprocalTable.
+//
+// The divisions are done by the free-standing function Divide:
+// if x is a n-bit integer and y is a m-bit integer then
+//
+// > Divide(x, n, y, m) ~= x / y.
+//
+// The equation is precise if n and m are small enough.
 
 class ReciprocalTable
 {
@@ -79,18 +227,6 @@ public:
     }
 } reciprocals;
 
-U32 Fit(U32 x, U32 n, U32 m)
-{
-    assert(x < (1 << n));
-    return (n > m) ? x >> (n - m) : x << (m - n);
-}
-
-U32 Fit0(U32 x, U32 n, U32 m)
-{
-    assert(0 < x && x < (1 << n));
-    return Fit(x, n, m) + 1 - (x >> (n - 1));
-}
-
 U32 Excess(U32 n, U32 m)
 {
     return (n > m) ? n - m : 0;
@@ -105,6 +241,45 @@ U32 Divide(U32 x, U32 n, U32 y, U32 m)
     U32 dk = RECIPROCAL_BITS + dm - dn;
     return ((x >> dn) * reciprocals[y >> dm]) >> dk;
 }
+
+// SOME UTILITY FUNCTIONS
+//
+// Fit changes the precision of probability values: if x is a n-bit
+// probability then Fit(x, n, m) is the closest m-bit probability.
+//
+// Fit0 is similar but it ensures the result does not become zero.
+
+U32 Fit(U32 x, U32 n, U32 m)
+{
+    assert(x < (1 << n));
+    return (n > m) ? x >> (n - m) : x << (m - n);
+}
+
+U32 Fit0(U32 x, U32 n, U32 m)
+{
+    assert(0 < x && x < (1 << n));
+    return Fit(x, n, m) + 1 - (x >> (n - 1));
+}
+
+// THE NODE
+//
+// The model is arranged as a binary tree where each node corresponds
+// a to a string of bits, it's context.  In each node statistics are
+// kept on the bit values that have occured in this context.  These
+// statistics are stored as a probability and as a total count.  One
+// could also store the statistics as a count of 1's and 0's:
+//
+// > p1 = n1/(n0+n1) <===> n1 = p1*(n0+n1).
+//
+// This would imply however that the resolution of p1 is small
+// whenever the counts are small which doesn't mesh well with
+// information inheritance.
+//
+// Probabilities are stored in the high-order bits of the field 'ctr'
+// and the total count in the low-order bits.
+//
+// To reduce memory usage on 64-bit systems all pointers are stored as
+// 32-bit offsets into the nodes pool.
 
 struct Node
 {
@@ -165,6 +340,20 @@ struct Node
     }
 };
 
+// THE MODEL
+//
+// There's always one active node in the model (field 'act').  This
+// node corresponds to the longest matching context stored in the
+// model and is used for making predictions (no other nodes are
+// consulted).  The bitwise order of the active node (i.e. the length
+// of it's context string in bits) is stored in the field 'order'.
+//
+// All contexts are byte-aligned so context strings always start on
+// byte boundaries (but can end wherever).
+//
+// The model is initialized as a order-0 (bytewise) model meaning
+// there are 255 nodes in the tree at first plus a special root node.
+
 class PPM
 {
     Node * nodes;
@@ -187,11 +376,11 @@ public:
         act = nodes + 1;
         order = 0;
 
-        *top++ = Node(1, 1, 0);
+        *top++ = Node(1, 1, 0);                 // 1   root node
         for (int dst = 2; dst != 256; dst += 2)
-            *top++ = Node(dst, dst+1, 0);
-        for (int i = 128; i != 256; ++i)
-            *top++ = Node(0, 0, 0);
+            *top++ = Node(dst, dst+1, 0);       // 127 internal nodes
+        for (int i = 0; i != 128; ++i)
+            *top++ = Node(0, 0, 0);             // 128 leaf nodes
     }
 
     U32 Predict()
@@ -233,6 +422,16 @@ public:
         return ((top - nodes) * sizeof(Node)) >> 20;
     }
 };
+
+// THE ARITHMETIC CODER
+//
+// The arithmetic coder here is pretty typical; carries are handled
+// with overflow being detected using a 64-bit low register and
+// handled not immediately but later on in the renormalization loop.
+//
+// The first outputted byte is always zero and is ignored by the
+// decoder.  This elides a branch in the renormalization loop.  I
+// haven't actually tested the speed impact of this optimization.
 
 class Encoder
 {
@@ -294,7 +493,7 @@ class Decoder
 {
     FILE * codeFile;
     U32 range;
-    U32 cml;
+    U32 cml; // code minus low
 public:
     Decoder(FILE * codeFile)
         : codeFile(codeFile),
@@ -332,6 +531,10 @@ public:
         }
     }
 };
+
+// THE PROGRESS BAR
+//
+// I added a progress bar.  This is it.
 
 class ProgressBar
 {
@@ -380,6 +583,11 @@ public:
                textLength, codeLength, seconds, bpc);
     }
 };
+
+// COMPRESS AND DECOMPRESS
+//
+// The compressed file is prefixed with it's uncompressed length; this
+// is why the program will not work with unseekable files.
 
 void Compress(FILE * textFile, FILE * codeFile)
 {
@@ -456,17 +664,33 @@ void Decompress(FILE * codeFile, FILE * textFile)
     bar.Finish(textLength, ftell(codeFile));
 }
 
+// GETOPT
+//
+// Here I have implemented a function for parsing command-line
+// arguments, a proposition so radical that neither the C nor the C++
+// standards committees have had the foresight necessary to include
+// such functionality in their respective standard libraries.
+//
+// This supports only a subset of GNU getopt's functionality.  The
+// most important of these omissions is that it cannot parse separate
+// arguments.  It does however shuffle the non-options to the end of
+// argv.
+
 char * optarg = NULL;
 int    optind = 0;
 
+// Example of a parse:
 // cmd -ab1 x y -cd2 z -e
 //
-// cmd              |       | -ab1  x y -cd2  z -e   --->   'a'
-// cmd              |       | -a*b1 x y -cd2  z -e   --->   'b' 1
-// cmd -ab1         |       |       x y -cd2  z -e   --->   'c'
-// cmd -ab1         | x y   |           -c*d2 z -e   --->   'd' 2
-// cmd -ab1 -cd2    | x y   |                 z -e   --->   'e'
-// cmd -ab1 -cd2 -e | x y z |                        --->   -1
+// cmd              |       | -ab1 x y -cd2 z -e   --->   'a'
+// cmd              |       | -ab1 x y -cd2 z -e   --->   'b' "1"
+// cmd -ab1         |       |   ^  x y -cd2 z -e   --->   'c'
+// cmd -ab1         | x y   |    \     -cd2 z -e   --->   'd' "2"
+// cmd -ab1 -cd2    | x y   |     \      ^  z -e   --->   'e'
+// cmd -ab1 -cd2 -e | x y z |      \    /          --->   -1
+//                  ^       ^       \  /
+//                 /       /         \/
+//           optind     end         next
 
 int getopt(int argc, char ** argv, const char * spec)
 {
@@ -519,6 +743,8 @@ int getopt(int argc, char ** argv, const char * spec)
         return opt[0];
     }
 }
+
+// MAIN
 
 int main(int argc, char ** argv)
 {
