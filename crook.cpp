@@ -540,24 +540,15 @@ class ProgressBar
 {
     static const int period = 1 << 18;
     clock_t start;
-public:
-    ProgressBar()
-    {
-        start = clock();
-    }
-
     void Display(U32 processed, U32 total, U32 memory)
     {
-        if (processed % period != 0)
-            return;
-
-        int percentage = (100 * processed + total / 2) / total;
+        int percentage = (processed + total/100-1) / (total/100);
         printf("\r%3d%% ", percentage);
 
         const char blocks[] = "[########################################]";
         const char spaces[] = "[                                        ]";
         int maxBlocks = 40;
-        int numBlocks = (maxBlocks * processed + total / 2) / total;
+        int numBlocks = (processed + total/maxBlocks-1) / (total/maxBlocks);
         int fromBlocks = numBlocks + 1;
         int fromSpaces = maxBlocks + 1 - numBlocks;
         fwrite(blocks             , fromBlocks, 1, stdout);
@@ -569,9 +560,22 @@ public:
 
         fflush(stdout);
     }
-
-    void Finish(U32 textLength, U32 codeLength)
+public:
+    ProgressBar()
     {
+        start = clock();
+    }
+
+    void Update(U32 processed, U32 total, U32 memory)
+    {
+        if (processed % period == 0)
+            Display(processed, total, memory);
+    }
+
+    void Finish(U32 textLength, U32 codeLength, U32 memory)
+    {
+        Display(textLength, textLength, memory);
+
         double seconds = (double)(clock() - start) / CLOCKS_PER_SEC;
         double bpc = 8.0 * codeLength / textLength;
 
@@ -605,7 +609,7 @@ void Compress(FILE * textFile, FILE * codeFile)
     PPM ppm;
     for (U32 processed = 0; processed != textLength; ++processed)
     {
-        bar.Display(processed, textLength, ppm.GetUsedMemory());
+        bar.Update(processed, textLength, ppm.GetUsedMemory());
 
         U32 c = getc(textFile);
         for (U32 mask = 1 << 7; mask != 0; mask >>= 1)
@@ -625,7 +629,7 @@ void Compress(FILE * textFile, FILE * codeFile)
         }
     }
     rc.FlushBuffer();
-    bar.Finish(textLength, ftell(codeFile));
+    bar.Finish(textLength, ftell(codeFile), ppm.GetUsedMemory());
 }
 
 void Decompress(FILE * codeFile, FILE * textFile)
@@ -642,7 +646,7 @@ void Decompress(FILE * codeFile, FILE * textFile)
     rc.FillBuffer();
     for (U32 processed = 0; processed != textLength; ++processed)
     {
-        bar.Display(processed, textLength, ppm.GetUsedMemory());
+        bar.Update(processed, textLength, ppm.GetUsedMemory());
 
         U32 c = 0;
         for (U32 mask = 1 << 7; mask != 0; mask >>= 1)
@@ -661,7 +665,7 @@ void Decompress(FILE * codeFile, FILE * textFile)
         }
         putc(c, textFile);
     }
-    bar.Finish(textLength, ftell(codeFile));
+    bar.Finish(textLength, ftell(codeFile), ppm.GetUsedMemory());
 }
 
 // GETOPT
