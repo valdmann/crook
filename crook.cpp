@@ -542,13 +542,13 @@ class ProgressBar
     clock_t start;
     void Display(U32 processed, U32 total, U32 memory)
     {
-        int percentage = (processed + total/100-1) / (total/100);
+        int percentage = (processed + total/100/2) / (total/100);
         printf("\r%3d%% ", percentage);
 
         const char blocks[] = "[########################################]";
         const char spaces[] = "[                                        ]";
         int maxBlocks = 40;
-        int numBlocks = (processed + total/maxBlocks-1) / (total/maxBlocks);
+        int numBlocks = (processed + total/maxBlocks/2) / (total/maxBlocks);
         int fromBlocks = numBlocks + 1;
         int fromSpaces = maxBlocks + 1 - numBlocks;
         fwrite(blocks             , fromBlocks, 1, stdout);
