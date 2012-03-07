@@ -1,5 +1,5 @@
-CXXFLAGS := -std=c++0x -O3 -s -fno-exceptions -finline-limit=10000 -fwhole-program -Wall -Wextra
-# CXXFLAGS := -std=c++0x -g -Wall -Wextra
+CXXFLAGS := -O3 -s -fno-exceptions -finline-limit=10000 -fwhole-program -Wall -Wextra
+# CXXFLAGS := -g -Wall -Wextra
 
 .PHONY: all
 all : crook
@@ -18,4 +18,5 @@ clean:
 check-syntax:
 	$(CXX) -Wall -Wextra -fsyntax-only $(CHK_SOURCES)
 
-crook : crook.cpp
+crook : crook.cpp *.hpp Makefile
+	$(CXX) $(CXXFLAGS) $< -o $@
