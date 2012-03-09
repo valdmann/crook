@@ -13,9 +13,6 @@
 
 #include "config.hpp"
 
-const U32 ARI_P_BITS  = 12;
-const U32 ARI_P_SCALE = 1 << ARI_P_BITS;
-
 class Encoder
 {
     FILE * codeFile;

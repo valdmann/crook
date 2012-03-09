@@ -22,11 +22,6 @@
 
 #include "config.hpp"
 
-const U32 DIVISOR_BITS     = 10;
-const U32 DIVISOR_LIMIT    = 1 << DIVISOR_BITS;
-const U32 RECIPROCAL_BITS  = 15;
-const U32 RECIPROCAL_LIMIT = 1 << RECIPROCAL_BITS;
-
 class ReciprocalTable
 {
     U16 t[DIVISOR_LIMIT];

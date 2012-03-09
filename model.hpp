@@ -36,14 +36,6 @@
 //
 // To reduce memory usage on 64-bit systems all pointers are stored as
 // 32-bit offsets into the nodes pool.
-//
-// Fractional numbers are represented in fixed-point form and the
-// following naming scheme is used for relevant constants:
-//   _BITS  - total bits for both the whole and the fractional parts together
-//   _SCALE - unit, i.e. the representation for the number 1
-//            if omitted then it's just 1 (i.e. there's no fractional part)
-//   _LIMIT - one larger than the largest number that can be represented
-//            if omitted then equal to _SCALE (i.e. there's no whole part)
 
 #ifndef MODEL_HPP
 #define MODEL_HPP
@@ -52,18 +44,6 @@
 
 #include "rc.hpp"
 #include "utility.hpp"
-
-const U32 PPM_P_BITS  = 22;
-const U32 PPM_C_BITS  = 10;
-const U32 PPM_P_SCALE = 1 << PPM_P_BITS;
-const U32 PPM_C_LIMIT = 1 << PPM_C_BITS;
-const U32 PPM_C_SCALE = 32;
-const U32 PPM_P_MASK  = (PPM_P_SCALE  - 1) << PPM_C_BITS;
-const U32 PPM_C_MASK  = PPM_C_LIMIT - 1;
-const U32 PPM_P_START = PPM_P_SCALE / 2;
-const U32 PPM_C_START = PPM_C_SCALE * 12;     // these were hand-tuned
-const U32 PPM_C_INH   = PPM_C_SCALE * 3 / 2;  // on enwik7
-const U32 PPM_C_INC   = PPM_C_SCALE;
 
 struct Node
 {
