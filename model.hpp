@@ -42,7 +42,6 @@
 
 #include "config.hpp"
 
-#include "rc.hpp"
 #include "utility.hpp"
 
 struct Node

@@ -1,4 +1,4 @@
-// THE ARITHMETIC CODER
+// THE ARITHMETIC ENCODER
 //
 // The arithmetic coder here is pretty typical; carries are handled
 // with overflow being detected using a 64-bit low register and
@@ -7,9 +7,11 @@
 // The first outputted byte is always zero and is ignored by the
 // decoder.  This elides a branch in the renormalization loop.  I
 // haven't actually tested the speed impact of this optimization.
+//
+// See also: the decoder in "decoder.hpp".
 
-#ifndef RC_HPP
-#define RC_HPP
+#ifndef RC_ENCODER_HPP
+#define RC_ENCODER_HPP
 
 #include "config.hpp"
 
@@ -68,48 +70,4 @@ public:
         putc(lo32 >>  0, codeFile);
     }
 };
-
-class Decoder
-{
-    FILE * codeFile;
-    U32 range;
-    U32 cml; // code minus low
-public:
-    Decoder(FILE * codeFile)
-        : codeFile(codeFile),
-          range(0xFFFFFFFF),
-          cml(0) {}
-
-    void FillBuffer()
-    {
-        for (int i = 0; i < 5; ++i)
-            cml = (cml << 8) + getc(codeFile);
-    }
-
-    bool Decode(U32 p1)
-    {
-        assert(0 < p1 && p1 < ARI_P_SCALE);
-        U32 mid = range / ARI_P_SCALE * p1;
-        if (cml < mid)
-        {
-            range = mid;
-            return 1;
-        }
-        else
-        {
-            cml -= mid, range -= mid;
-            return 0;
-        }
-    }
-
-    void Normalize()
-    {
-        while (range <= 0xFFFFFF)
-        {
-            cml = (cml << 8) + getc(codeFile);
-            range <<= 8;
-        }
-    }
-};
-
 #endif

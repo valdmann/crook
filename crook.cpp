@@ -4,7 +4,8 @@
 #include "getopt.hpp"
 #include "model.hpp"
 #include "progress_bar.hpp"
-#include "rc.hpp"
+#include "rc_decoder.hpp"
+#include "rc_encoder.hpp"
 
 #include <cerrno>
 #include <cstdlib>
