@@ -154,7 +154,6 @@ int main(int argc, char ** argv)
         return 0;
     }
 
-
     if ((argv[optind][0] != 'c' && argv[optind][0] != 'd') ||
         argv[optind][1] != 0)
     {
