@@ -14,9 +14,6 @@
 #include <algorithm>
 #include <ctime>
 
-extern int command;
-extern int memoryLimit;
-
 class ProgressBar
 {
     static const int period = 1 << 18;

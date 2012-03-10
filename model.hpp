@@ -132,9 +132,6 @@ struct Node
     }
 };
 
-extern int memoryLimit;
-extern int orderLimit;
-
 class PPM
 {
     Node * nodes;

@@ -59,4 +59,9 @@ const U32 PPM_C_START = PPM_C_SCALE * 12;     // these were hand-tuned
 const U32 PPM_C_INH   = PPM_C_SCALE * 3 / 2;  // on enwik7
 const U32 PPM_C_INC   = PPM_C_SCALE;
 
+// global command line options, defined in "crook.cpp".
+extern int command;     // 'c' or 'd'
+extern int memoryLimit; // memory limit in MiB
+extern int orderLimit;  //  order limit in bytes
+
 #endif
