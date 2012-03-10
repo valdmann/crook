@@ -82,8 +82,6 @@ struct Node
     Ptr sfx;
     U32 ctr;
 
-    Node() {}
-
     Node(U32 ext0, U32 ext1, U32 sfx, Node * nodes)
         : ext0(ext0, nodes),
           ext1(ext1, nodes),
@@ -153,7 +151,7 @@ public:
         : nodesLimit(memoryLimit * (1 << 20) / sizeof(Node)),
           orderLimitBits(8 * orderLimit + 7)
     {
-        nodes = new Node[nodesLimit];
+        nodes = (Node *) new U8[nodesLimit * sizeof(Node)];
         end = nodes + nodesLimit;
         top = nodes;
         act = nodes + 1;
