@@ -44,26 +44,57 @@
 
 #include "utility.hpp"
 
+template <class T, int SIZE> class PtrType;
+
+template <class T> class PtrType<T, 4>
+{
+    T * p_;
+public:
+    PtrType(               ) : p_(0) {};
+    PtrType(T * p, T * base) : p_(p) {};
+    PtrType(U32 i, T * base) : p_(base + i) {};
+
+    T * Get(T * base) { return p_; }
+
+    bool IsZero(T * base) { return p_ == base; }
+};
+
+template <class T> class PtrType<T, 8>
+{
+    U32 i_;
+public:
+    PtrType(               ) : i_(0) {};
+    PtrType(T * p, T * base) : i_((U8*)p - (U8*)base) {};
+    PtrType(U32 i, T *     ) : i_(i*sizeof(T)) {};
+
+    T * Get(T * base) { return (T*)((U8*)base + i_); }
+
+    bool IsZero(T *) { return i_ == 0; }
+};
+
+struct Node;
+typedef PtrType<Node, sizeof(Node *)> Ptr;
+
 struct Node
 {
-    U32 ext0;
-    U32 ext1;
-    U32 sfx;
+    Ptr ext0;
+    Ptr ext1;
+    Ptr sfx;
     U32 ctr;
 
     Node() {}
 
-    Node(U32 ext0, U32 ext1, U32 sfx)
-        : ext0(ext0),
-          ext1(ext1),
-          sfx(sfx),
+    Node(U32 ext0, U32 ext1, U32 sfx, Node * nodes)
+        : ext0(ext0, nodes),
+          ext1(ext1, nodes),
+          sfx ( sfx, nodes),
           ctr((PPM_P_START << PPM_C_BITS) + PPM_C_START) {}
 
-    Node(U32 sfx, Node * nodes)
-        : ext0(0),
-          ext1(0),
-          sfx(sfx),
-          ctr(((nodes + sfx)->ctr & PPM_P_MASK) + PPM_C_INH) {}
+    Node(Node * sfx, Node * nodes)
+        : ext0((U32)0, nodes),
+          ext1((U32)0, nodes),
+          sfx (   sfx, nodes),
+          ctr((sfx->ctr & PPM_P_MASK) + PPM_C_INH) {}
 
     U32 Predict()
     {
@@ -97,7 +128,7 @@ struct Node
         ctr = (p1 << PPM_C_BITS) + cnt;
     }
 
-    template <bool bit> U32 & Ext()
+    template <bool bit> Ptr & Ext()
     {
         return bit ? ext1 : ext0;
     }
@@ -128,11 +159,11 @@ public:
         act = nodes + 1;
         order = 0;
 
-        *top++ = Node(1, 1, 0);                 // 1   root node
+        *top++ = Node(1, 1, 0, nodes);           // 1   root node
         for (int dst = 2; dst != 256; dst += 2)
-            *top++ = Node(dst, dst+1, 0);       // 127 internal nodes
+            *top++ = Node(dst, dst+1, 0, nodes); // 127 internal nodes
         for (int i = 0; i != 128; ++i)
-            *top++ = Node(0, 0, 0);             // 128 leaf nodes
+            *top++ = Node(0, 0, 0, nodes);       // 128 leaf nodes
     }
 
     U32 Predict()
@@ -145,25 +176,25 @@ public:
         act->Update<bit>();
 
         Node * lst = act;
-        while (act->Ext<bit>() == 0)
+        while (act->Ext<bit>().IsZero(nodes))
         {
             lst = act;
-            act = nodes + act->sfx;
+            act = act->sfx.Get(nodes);
             order -= 8;
             act->Update<bit>();
         }
 
+        Node * ext = act->Ext<bit>().Get(nodes);
+
         if (act != lst && order+9 <= orderLimitBits && top < end)
         {
-            Node * ext = nodes + act->Ext<bit>();
-            lst->Ext<bit>() = top - nodes;
-            *top = Node(ext - nodes, nodes);
+            lst->Ext<bit>() = Ptr(top, nodes);
+            *top = Node(ext, nodes);
             act = top++;
             order += 9;
         }
         else
         {
-            Node * ext = nodes + act->Ext<bit>();
             act = ext;
             order++;
         }
