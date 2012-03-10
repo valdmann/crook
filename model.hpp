@@ -59,11 +59,11 @@ struct Node
           sfx(sfx),
           ctr((PPM_P_START << PPM_C_BITS) + PPM_C_START) {}
 
-    Node(U32 sfx, const Node * sfxp)
+    Node(U32 sfx, Node * nodes)
         : ext0(0),
           ext1(0),
           sfx(sfx),
-          ctr((sfxp->ctr & PPM_P_MASK) + PPM_C_INH) {}
+          ctr(((nodes + sfx)->ctr & PPM_P_MASK) + PPM_C_INH) {}
 
     U32 Predict()
     {
@@ -157,7 +157,7 @@ public:
         {
             Node * ext = nodes + act->Ext<bit>();
             lst->Ext<bit>() = top - nodes;
-            *top = Node(ext - nodes, ext);
+            *top = Node(ext - nodes, nodes);
             act = top++;
             order += 9;
         }
