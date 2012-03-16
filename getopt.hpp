@@ -41,12 +41,12 @@ int getopt(int argc, char ** argv, const char * spec)
 
     if (next == NULL || next[0] == '\0')
     {
-	rotate(argv + optind, argv + end, argv + end + 1);
-	++optind;
-	++end;
+        rotate(argv + optind, argv + end, argv + end + 1);
+        ++optind;
+        ++end;
 
         while (end != argc && (argv[end][0] != '-' || argv[end][1] == '\0'))
-	    ++end;
+            ++end;
 
         if (end == argc)
             return -1;
@@ -60,7 +60,7 @@ int getopt(int argc, char ** argv, const char * spec)
     {
         fprintf(stderr, "%s: invalid option '-%c'\n",
                 argv[0], next[0]);
-	optarg = NULL;
+        optarg = NULL;
         ++next;
         return '?';
     }
@@ -68,19 +68,19 @@ int getopt(int argc, char ** argv, const char * spec)
     {
         fprintf(stderr, "%s: missing argument for option '-%c'\n",
                 argv[0], next[0]);
-	optarg = NULL;
-	next = NULL;
+        optarg = NULL;
+        next = NULL;
         return '?';
     }
     else if (opt[1] == ':' && next[1] != '\0')
     {
-	optarg = next + 1;
-	next = NULL;
-	return opt[0];
+        optarg = next + 1;
+        next = NULL;
+        return opt[0];
     }
     else
     {
-	optarg = NULL;
+        optarg = NULL;
         ++next;
         return opt[0];
     }

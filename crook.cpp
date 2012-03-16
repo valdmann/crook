@@ -158,13 +158,13 @@ int main(int argc, char ** argv)
         argv[optind][1] != 0)
     {
         fprintf(stderr, "%s: unrecognized command '%s'\n",
-	       	argv[0], argv[optind]);
+                argv[0], argv[optind]);
         return 1;
     }
 
     if (optind + 2 >= argc)
     {
-	fprintf(stderr, "%s: not enough arguments given\n", argv[0]);
+        fprintf(stderr, "%s: not enough arguments given\n", argv[0]);
         return 1;
     }
 
@@ -173,16 +173,16 @@ int main(int argc, char ** argv)
     FILE * input = fopen(argv[optind+1], "rb");
     if (input == NULL)
     {
-	fprintf(stderr, "%s: cannot open '%s' (%s)\n",
-		argv[0], argv[optind+1], strerror(errno));
+        fprintf(stderr, "%s: cannot open '%s' (%s)\n",
+                argv[0], argv[optind+1], strerror(errno));
         return 1;
     }
 
     FILE * output = fopen(argv[optind+2], "wb");
     if (output == NULL)
     {
-	fprintf(stderr, "%s: cannot open '%s' (%s)\n",
-		argv[0], argv[optind+2], strerror(errno));
+        fprintf(stderr, "%s: cannot open '%s' (%s)\n",
+                argv[0], argv[optind+2], strerror(errno));
         return 1;
     }
 
